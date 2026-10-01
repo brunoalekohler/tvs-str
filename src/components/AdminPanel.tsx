@@ -93,8 +93,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Video & Cycle Settings State
   const [agendaMin, setAgendaMin] = useState(cycleConfig?.agendaMinutes ?? 5);
   const [agendaSec, setAgendaSec] = useState(cycleConfig?.agendaSeconds ?? 0);
-  const [videoMin, setVideoMin] = useState(cycleConfig?.videoMinutes ?? 16);
-  const [videoSec, setVideoSec] = useState(cycleConfig?.videoSeconds ?? 59);
+  const [videoMin, setVideoMin] = useState(cycleConfig?.videoMinutes ?? 1);
+  const [videoSec, setVideoSec] = useState(cycleConfig?.videoSeconds ?? 6);
   const [videoUrlVal, setVideoUrlVal] = useState(cycleConfig?.videoUrl || '/video.mp4');
   const [videoFitVal, setVideoFitVal] = useState<'contain' | 'cover'>(cycleConfig?.videoFit || 'cover');
   const [videoSavedMsg, setVideoSavedMsg] = useState('');
@@ -357,7 +357,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             }`}
           >
             <Film className="w-3.5 h-3.5" />
-            <span>Vídeo & Ciclo (16:59 / 5:00)</span>
+            <span>Vídeo & Ciclo (1:06 / 5:00)</span>
           </button>
           <button
             onClick={() => setActiveTab('tests')}
@@ -1127,7 +1127,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div>
                   <h2 className="text-xl font-bold text-white">Ciclo de Exibição & Vídeo Operacional</h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Alternância cronometrada entre a Agenda Semanal (5 min) e o Vídeo Operacional (16:59 min) em tela cheia com a nav bar visível.
+                    Alternância cronometrada entre a Agenda Semanal (5 min) e o Vídeo Operacional (1m 06s) em tela cheia.
                   </p>
                 </div>
               </div>
@@ -1216,7 +1216,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <h3 className="text-sm font-bold text-white">Tempo do Vídeo Operacional</h3>
                     </div>
                     <p className="text-xs text-slate-400">
-                      Duração do vídeo em tela cheia com a barra superior antes de retornar à agenda.
+                      Duração do vídeo em tela cheia antes de retornar à agenda.
                     </p>
 
                     <div className="grid grid-cols-2 gap-3 pt-1">
@@ -1248,7 +1248,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
                     <div className="text-[11px] font-mono text-amber-300 bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20">
-                      Configurado: <strong>{videoMin}m {videoSec < 10 ? '0' : ''}{videoSec}s</strong> (Padrão: 16m 59s)
+                      Configurado: <strong>{videoMin}m {videoSec < 10 ? '0' : ''}{videoSec}s</strong> (Padrão: 1m 06s)
                     </div>
                   </div>
                 </div>

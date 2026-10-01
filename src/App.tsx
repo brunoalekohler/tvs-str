@@ -111,17 +111,26 @@ export default function App() {
     return () => unsubscribe();
   }, [loadEvents, refreshConfig.realtimeEnabled]);
 
-  // 3. Cycle Configuration: 5 min Agenda <-> 16:59 min Video
+  // 3. Cycle Configuration: 5 min Agenda <-> 1m 06s Video
   const [cycleConfig, setCycleConfig] = useState<CycleConfig>(() => {
     try {
       const saved = localStorage.getItem('corporative_cycle_config');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Automatically migrate previous 16:59 to new 1:06 setting
+        if (parsed.videoMinutes === 16 && parsed.videoSeconds === 59) {
+          parsed.videoMinutes = 1;
+          parsed.videoSeconds = 6;
+          localStorage.setItem('corporative_cycle_config', JSON.stringify(parsed));
+        }
+        return parsed;
+      }
     } catch {}
     return {
       agendaMinutes: 5,
       agendaSeconds: 0,
-      videoMinutes: 16,
-      videoSeconds: 59,
+      videoMinutes: 1,
+      videoSeconds: 6,
       videoUrl: '/video.mp4',
       videoName: 'video.mp4',
       videoFit: 'cover',

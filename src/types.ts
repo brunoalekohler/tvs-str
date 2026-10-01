@@ -31,10 +31,10 @@ export type DisplayMode = 'calendar' | 'video' | 'clock';
 export interface CycleConfig {
   agendaMinutes: number; // 5 min
   agendaSeconds: number; // 0 sec
-  videoMinutes: number;  // 16 min
-  videoSeconds: number;  // 59 sec
-  videoUrl: string;      // '/video-instrucoes.mp4'
-  videoName: string;     // 'video instruções para operações_20261001_145500_0000.mp4'
+  videoMinutes: number;  // 1 min
+  videoSeconds: number;  // 6 sec
+  videoUrl: string;      // '/video.mp4'
+  videoName: string;     // 'video.mp4'
   videoFit: 'contain' | 'cover';
   videoMuted: boolean;
 }
