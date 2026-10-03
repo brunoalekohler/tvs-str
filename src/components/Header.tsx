@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, ShieldCheck, RotateCw, Calendar, Film } from 'lucide-react';
-import { CompanyConfig, DisplayMode } from '../types';
+import { Settings, ShieldCheck, RotateCw, Calendar } from 'lucide-react';
+import { CompanyConfig } from '../types';
 
 interface HeaderProps {
   company: CompanyConfig;
@@ -9,9 +9,6 @@ interface HeaderProps {
   isSyncing?: boolean;
   lastSyncTime?: Date | null;
   secondsUntilReload?: number | null;
-  currentMode?: DisplayMode;
-  remainingModeSeconds?: number | null;
-  onToggleMode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,9 +18,6 @@ export const Header: React.FC<HeaderProps> = ({
   isSyncing = false,
   lastSyncTime = null,
   secondsUntilReload = null,
-  currentMode,
-  remainingModeSeconds = null,
-  onToggleMode,
 }) => {
   // Deduplicated candidate list: custom URL first, then standard static files in /public/
   const candidateLogos = Array.from(
@@ -78,31 +72,12 @@ export const Header: React.FC<HeaderProps> = ({
           </h1>
         </div>
 
-        {/* Right: Sync Status, Mode Indicator & Admin Button */}
+        {/* Right: Badge, Sync Status & Admin Button */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Current Display Mode Chip (Agenda 5:00 <-> Vídeo 16:59) */}
-          {currentMode && remainingModeSeconds !== null && (
-            <button
-              onClick={onToggleMode}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border text-xs font-mono font-medium transition-all active:scale-95 cursor-pointer ${
-                currentMode === 'video'
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-                  : 'bg-blue-500/10 border-blue-500/30 text-blue-300 hover:bg-blue-500/20'
-              }`}
-              title={`Modo atual: ${currentMode === 'video' ? 'Vídeo Operacional' : 'Agenda Semanal'}. Clique para alternar manualmente.`}
-            >
-              {currentMode === 'video' ? (
-                <Film className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              ) : (
-                <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-              )}
-              <span className="hidden sm:inline font-sans">{currentMode === 'video' ? 'Vídeo' : 'Agenda'}</span>
-              <span className="font-bold">
-                {Math.floor(remainingModeSeconds / 60)}:
-                {String(remainingModeSeconds % 60).padStart(2, '0')}
-              </span>
-            </button>
-          )}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/50 border border-slate-700/60 text-xs font-mono text-slate-300">
+            <Calendar className="w-3.5 h-3.5 text-blue-400" />
+            <span>Agenda Semanal</span>
+          </div>
 
           {onManualRefresh && (
             <button

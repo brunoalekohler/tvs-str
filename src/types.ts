@@ -26,18 +26,7 @@ export interface CompanyConfig {
   department: string;
 }
 
-export type DisplayMode = 'calendar' | 'video' | 'clock';
-
-export interface CycleConfig {
-  agendaMinutes: number; // 5 min
-  agendaSeconds: number; // 0 sec
-  videoMinutes: number;  // 1 min
-  videoSeconds: number;  // 6 sec
-  videoUrl: string;      // '/video.mp4'
-  videoName: string;     // 'video.mp4'
-  videoFit: 'contain' | 'cover';
-  videoMuted: boolean;
-}
+export type DisplayMode = 'calendar' | 'clock';
 
 export interface AutoRefreshConfig {
   syncIntervalSeconds: number; // e.g. 15, 30, 60

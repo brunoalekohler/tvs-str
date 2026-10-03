@@ -1,6 +1,6 @@
 {
   "name": "SANTA ROSA MALHAS - Painel Corporativo",
-  "description": "Painel corporativo Santa Rosa Malhas com ciclo de 5 minutos de agenda semanal e 1 minuto e 6 segundos de vídeo operacional em tela cheia, alertas sonoros e integração Supabase.",
+  "description": "Painel corporativo Santa Rosa Malhas com agenda semanal de eventos, avisos de trocas de turno, alertas sonoros e integração Supabase em tempo real.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

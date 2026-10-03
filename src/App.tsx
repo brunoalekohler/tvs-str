@@ -6,8 +6,7 @@ import { WeeklyScheduleView } from './components/WeeklyScheduleView';
 import { EventAlertModal } from './components/EventAlertModal';
 import { ShiftAlertModal } from './components/ShiftAlertModal';
 import { AdminPanel } from './components/AdminPanel';
-import { FullscreenVideoView } from './components/FullscreenVideoView';
-import { EventItem, CompanyConfig, DisplayMode, ShiftDefinition, AutoRefreshConfig, CycleConfig } from './types';
+import { EventItem, CompanyConfig, DisplayMode, ShiftDefinition, AutoRefreshConfig } from './types';
 import {
   fetchEvents,
   deleteEvent,
@@ -17,7 +16,6 @@ import {
 } from './services/supabase';
 import { INITIAL_SHIFTS } from './data/initialEvents';
 import { unlockAudio } from './utils/sound';
-import { storeVideoFile, getStoredVideo, removeStoredVideo } from './utils/videoStorage';
 
 const COMPANY_NAME = 'SANTA ROSA MALHAS';
 
@@ -111,45 +109,8 @@ export default function App() {
     return () => unsubscribe();
   }, [loadEvents, refreshConfig.realtimeEnabled]);
 
-  // 3. Cycle Configuration: 5 min Agenda <-> 1m 06s Video
-  const [cycleConfig, setCycleConfig] = useState<CycleConfig>(() => {
-    try {
-      const saved = localStorage.getItem('corporative_cycle_config');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Automatically migrate previous 16:59 to new 1:06 setting
-        if (parsed.videoMinutes === 16 && parsed.videoSeconds === 59) {
-          parsed.videoMinutes = 1;
-          parsed.videoSeconds = 6;
-          localStorage.setItem('corporative_cycle_config', JSON.stringify(parsed));
-        }
-        return parsed;
-      }
-    } catch {}
-    return {
-      agendaMinutes: 5,
-      agendaSeconds: 0,
-      videoMinutes: 1,
-      videoSeconds: 6,
-      videoUrl: '/video.mp4',
-      videoName: 'video.mp4',
-      videoFit: 'cover',
-      videoMuted: true,
-    };
-  });
-
-  const handleUpdateCycleConfig = (newConfig: CycleConfig) => {
-    setCycleConfig(newConfig);
-    localStorage.setItem('corporative_cycle_config', JSON.stringify(newConfig));
-  };
-
-  const totalAgendaSec = Math.max(10, (cycleConfig.agendaMinutes * 60) + cycleConfig.agendaSeconds);
-  const totalVideoSec = Math.max(10, (cycleConfig.videoMinutes * 60) + cycleConfig.videoSeconds);
-
-  // Active mode: starts with 'calendar' (Agenda Semanal)
+  // 4. Calendar View Mode & Pagination
   const [mode, setMode] = useState<DisplayMode>('calendar');
-  const [remainingModeSeconds, setRemainingModeSeconds] = useState<number>(totalAgendaSec);
-  const [activeVideoUrl, setActiveVideoUrl] = useState<string>(cycleConfig.videoUrl || '/video.mp4');
   const [calendarPage, setCalendarPage] = useState<number>(0);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [activeEventAlert, setActiveEventAlert] = useState<EventItem | null>(null);
@@ -165,120 +126,43 @@ export default function App() {
     }
   }, [events.length, totalPages, calendarPage]);
 
-  // Load user-saved video from IndexedDB on startup if available, otherwise default to public/video.mp4
+  // Rotate pages within calendar mode if totalPages > 1 every 20 seconds
   useEffect(() => {
-    getStoredVideo().then((stored) => {
-      if (stored && stored.url) {
-        setActiveVideoUrl(stored.url);
-        if (stored.name) {
-          setCycleConfig((prev) => ({ ...prev, videoName: stored.name, videoUrl: stored.url }));
-        }
-      } else {
-        setActiveVideoUrl('/video.mp4');
-      }
-    });
-  }, []);
-
-  const handleUploadVideoFile = async (file: File) => {
-    await storeVideoFile(file, file.name);
-    const newUrl = URL.createObjectURL(file);
-    setActiveVideoUrl(newUrl);
-    const updated: CycleConfig = {
-      ...cycleConfig,
-      videoName: file.name,
-      videoUrl: newUrl,
-    };
-    handleUpdateCycleConfig(updated);
-  };
-
-  const handleResetVideoToDefault = async () => {
-    await removeStoredVideo();
-    setActiveVideoUrl('/video.mp4');
-    const updated: CycleConfig = {
-      ...cycleConfig,
-      videoName: 'video.mp4',
-      videoUrl: '/video.mp4',
-    };
-    handleUpdateCycleConfig(updated);
-  };
-
-  const handleSwitchMode = (newMode: DisplayMode) => {
-    if (!audioUnlocked) handleAudioUnlock();
-    setMode(newMode);
-    if (newMode === 'video') {
-      setRemainingModeSeconds(totalVideoSec);
-    } else {
-      setCalendarPage(0);
-      setRemainingModeSeconds(totalAgendaSec);
-    }
-  };
-
-  // Precise timing cycle: 5 minutes of Agenda <-> 16:59 of Video
-  useEffect(() => {
-    const cycleInterval = setInterval(() => {
-      // Pause countdown if an emergency or scheduled alert is currently showing
-      if (activeEventAlert || activeShiftAlert) return;
-
-      setRemainingModeSeconds((prev) => {
-        if (prev <= 1) {
-          // Switch between calendar and video
-          if (mode === 'calendar') {
-            setMode('video');
-            return totalVideoSec;
-          } else {
-            setMode('calendar');
-            setCalendarPage(0);
-            return totalAgendaSec;
-          }
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(cycleInterval);
-  }, [mode, totalAgendaSec, totalVideoSec, activeEventAlert, activeShiftAlert]);
-
-  // Rotate pages within calendar mode if totalPages > 1 during the 5-minute window
-  useEffect(() => {
-    if (mode !== 'calendar' || totalPages <= 1) return;
+    if (totalPages <= 1) return;
     const pageInterval = setInterval(() => {
       setCalendarPage((prev) => (prev + 1) % totalPages);
     }, 20000); // 20s per page
     return () => clearInterval(pageInterval);
-  }, [mode, totalPages]);
+  }, [totalPages]);
 
   // Manual advance helper (Click or Keyboard)
   const handleManualAdvance = () => {
     if (!audioUnlocked) handleAudioUnlock();
-    if (mode === 'calendar') {
-      if (calendarPage + 1 < totalPages) {
-        setCalendarPage((prev) => prev + 1);
-      } else {
-        handleSwitchMode('video');
-      }
-    } else {
-      handleSwitchMode('calendar');
-    }
+    setCalendarPage((prev) => (prev + 1) % totalPages);
   };
 
-  // Keyboard navigation support (Spacebar or Arrow keys to quickly advance, 'a' for admin)
+  // Keyboard navigation support (Spacebar or Arrow keys to turn page, A for admin)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'a' || e.key === 'A') {
         if (!isAdminOpen) {
           setIsAdminOpen(true);
         }
-      } else if (e.code === 'Space' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      } else if (e.code === 'Space' || e.key === 'ArrowRight') {
         if (!isAdminOpen) {
-          handleManualAdvance();
+          setCalendarPage((prev) => (prev + 1) % totalPages);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (!isAdminOpen) {
+          setCalendarPage((prev) => (prev - 1 + totalPages) % totalPages);
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAdminOpen, mode, calendarPage, totalPages]);
+  }, [isAdminOpen, totalPages]);
 
-  // 4. Audio Unlock State
+  // 5. Audio Unlock State
   const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   const handleAudioUnlock = () => {
@@ -288,116 +172,77 @@ export default function App() {
     }
   };
 
-  // 5. Admin Panel Detection (via /admin in URL)
-  const checkAdminRoute = useCallback(() => {
-    const pathname = window.location.pathname;
-    const hash = window.location.hash;
-    if (pathname === '/admin' || hash === '#admin' || hash === '#/admin') {
-      setIsAdminOpen(true);
-    } else {
-      setIsAdminOpen(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkAdminRoute();
-    window.addEventListener('popstate', checkAdminRoute);
-    window.addEventListener('hashchange', checkAdminRoute);
-    return () => {
-      window.removeEventListener('popstate', checkAdminRoute);
-      window.removeEventListener('hashchange', checkAdminRoute);
-    };
-  }, [checkAdminRoute]);
-
-  const openAdmin = () => {
-    setIsAdminOpen(true);
-    try {
-      window.history.pushState(null, '', '/admin');
-    } catch {
-      window.location.hash = '#admin';
-    }
-  };
-
-  const closeAdmin = () => {
-    setIsAdminOpen(false);
-    try {
-      window.history.pushState(null, '', '/');
-    } catch {
-      window.location.hash = '';
-    }
-  };
-
-  // 6. Real-time Event Monitor & Fullscreen 1-Minute Alert
+  // 6. Real-time Event Monitor (Triggers exact event alert modal at start time)
   const alertedEventIdsRef = useRef<Set<string>>(new Set());
 
-  // Check event triggers every 2 seconds
   useEffect(() => {
-    const checkEventsInterval = setInterval(() => {
+    const checkUpcomingEvents = () => {
       const now = new Date();
-      const todayYMD = now.toISOString().split('T')[0];
+      const currentYear = now.getFullYear();
+      const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+      const currentDay = String(now.getDate()).padStart(2, '0');
+      const todayYMD = `${currentYear}-${currentMonth}-${currentDay}`;
       const currentHours = String(now.getHours()).padStart(2, '0');
       const currentMinutes = String(now.getMinutes()).padStart(2, '0');
-      const currentTimeStr = `${currentHours}:${currentMinutes}`;
+      const currentTimeHM = `${currentHours}:${currentMinutes}`;
 
       events.forEach((event) => {
-        // Trigger if date matches today and startTime matches current time
-        const eventKey = `${event.id}_${todayYMD}_${event.startTime}`;
-        if (
-          event.date === todayYMD &&
-          event.startTime === currentTimeStr &&
-          !alertedEventIdsRef.current.has(eventKey)
-        ) {
-          alertedEventIdsRef.current.add(eventKey);
-          setActiveEventAlert(event);
+        if (event.date === todayYMD && event.startTime === currentTimeHM) {
+          const alertKey = `${event.id}-${todayYMD}-${currentTimeHM}`;
+          if (!alertedEventIdsRef.current.has(alertKey)) {
+            alertedEventIdsRef.current.add(alertKey);
+            setActiveEventAlert(event);
+          }
         }
       });
-    }, 2000);
+    };
 
-    return () => clearInterval(checkEventsInterval);
+    const intervalId = setInterval(checkUpcomingEvents, 1000);
+    return () => clearInterval(intervalId);
   }, [events]);
 
-  // Handle Event Alert Dismissal / Completion
-  // Requirement: "após o evento acontecer ele deve sumir do supabase"
   const handleDismissEventAlert = async () => {
     if (activeEventAlert) {
-      const idToDelete = activeEventAlert.id;
-      setActiveEventAlert(null);
-      // Remove from Supabase and local cache
       try {
-        await deleteEvent(idToDelete);
-        setEvents((prev) => prev.filter((e) => e.id !== idToDelete));
+        await deleteEvent(activeEventAlert.id);
+        setEvents((prev) => prev.filter((ev) => ev.id !== activeEventAlert.id));
+        saveLocalEvents(events.filter((ev) => ev.id !== activeEventAlert.id));
       } catch (err) {
-        console.error('Failed to remove event after occurrence:', err);
+        console.error('Error auto-removing expired event:', err);
       }
     }
+    setActiveEventAlert(null);
   };
 
-  // 7. Shift Start Monitor (05:00, 13:30, 22:00)
-  const alertedShiftsRef = useRef<Set<string>>(new Set());
+  // 7. Shift Change Announcements: 05:00 (1º Turno), 13:30 (2º Turno), 22:00 (3º Turno)
+  const lastAlertedShiftRef = useRef<string>('');
 
   useEffect(() => {
-    const checkShiftsInterval = setInterval(() => {
+    const checkShiftTimes = () => {
       const now = new Date();
-      const todayYMD = now.toISOString().split('T')[0];
       const currentHours = String(now.getHours()).padStart(2, '0');
       const currentMinutes = String(now.getMinutes()).padStart(2, '0');
-      const currentTimeStr = `${currentHours}:${currentMinutes}`;
+      const currentTimeHM = `${currentHours}:${currentMinutes}`;
 
-      INITIAL_SHIFTS.forEach((shift) => {
-        const shiftKey = `${shift.startTime}_${todayYMD}`;
-        if (shift.startTime === currentTimeStr && !alertedShiftsRef.current.has(shiftKey)) {
-          alertedShiftsRef.current.add(shiftKey);
-          setActiveShiftAlert(shift);
+      const matchedShift = INITIAL_SHIFTS.find((s) => s.startTime === currentTimeHM);
+      if (matchedShift) {
+        const todayDate = now.toDateString();
+        const shiftAlertKey = `${todayDate}-${matchedShift.id}`;
+
+        if (lastAlertedShiftRef.current !== shiftAlertKey) {
+          lastAlertedShiftRef.current = shiftAlertKey;
+          setActiveShiftAlert(matchedShift);
         }
-      });
-    }, 2000);
+      }
+    };
 
-    return () => clearInterval(checkShiftsInterval);
+    const shiftCheckInterval = setInterval(checkShiftTimes, 1000);
+    return () => clearInterval(shiftCheckInterval);
   }, []);
 
-  // 8. Countdown Timer for Automatic Page Reload (with alert protection)
+  // 8. Auto-Reload Countdown for Display Kiosks / Industrial TVs
   useEffect(() => {
-    if (!refreshConfig.autoReloadMinutes || refreshConfig.autoReloadMinutes <= 0) {
+    if (refreshConfig.autoReloadMinutes <= 0) {
       setSecondsUntilReload(null);
       return;
     }
@@ -405,15 +250,14 @@ export default function App() {
     setSecondsUntilReload(refreshConfig.autoReloadMinutes * 60);
 
     const countdownTimer = setInterval(() => {
+      // Don't interrupt while an alert modal is open
+      if (activeEventAlert || activeShiftAlert) return;
+
       setSecondsUntilReload((prev) => {
         if (prev === null) return null;
         if (prev <= 1) {
-          // If modal is currently showing, postpone reload by 60s
-          if (activeEventAlert || activeShiftAlert) {
-            return 60;
-          }
           window.location.reload();
-          return 0;
+          return refreshConfig.autoReloadMinutes * 60;
         }
         return prev - 1;
       });
@@ -422,6 +266,29 @@ export default function App() {
     return () => clearInterval(countdownTimer);
   }, [refreshConfig.autoReloadMinutes, activeEventAlert, activeShiftAlert]);
 
+  // Support URL routing for /admin
+  useEffect(() => {
+    const checkPath = () => {
+      if (
+        window.location.pathname === '/admin' ||
+        window.location.hash === '#admin' ||
+        window.location.search.includes('admin')
+      ) {
+        setIsAdminOpen(true);
+      }
+    };
+    checkPath();
+    window.addEventListener('popstate', checkPath);
+    return () => window.removeEventListener('popstate', checkPath);
+  }, []);
+
+  const closeAdmin = () => {
+    setIsAdminOpen(false);
+    if (window.location.pathname === '/admin') {
+      window.history.pushState({}, '', '/');
+    }
+  };
+
   return (
     <div
       onClick={() => {
@@ -429,46 +296,24 @@ export default function App() {
       }}
       className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none overflow-hidden relative"
     >
-      {/* Main Corporate Header (Hidden during Video mode for 100% full screen video without exceptions) */}
-      {mode !== 'video' && (
-        <Header
-          company={company}
-          onOpenAdmin={() => setIsAdminOpen(true)}
-          onManualRefresh={() => loadEvents()}
-          isSyncing={isSyncing}
-          lastSyncTime={lastSyncTime}
-          secondsUntilReload={secondsUntilReload}
-          currentMode={mode}
-          remainingModeSeconds={remainingModeSeconds}
-          onToggleMode={() => handleSwitchMode(mode === 'video' ? 'calendar' : 'video')}
-        />
-      )}
+      {/* Main Corporate Header: SANTA ROSA MALHAS */}
+      <Header
+        company={company}
+        onOpenAdmin={() => setIsAdminOpen(true)}
+        onManualRefresh={() => loadEvents()}
+        isSyncing={isSyncing}
+        lastSyncTime={lastSyncTime}
+        secondsUntilReload={secondsUntilReload}
+      />
 
-      {/* Dynamic Display Area: Agenda Semanal (5 min) <-> Vídeo Tela Cheia (16:59 min) */}
+      {/* Dynamic Display Area: Agenda Semanal */}
       <main
         onClick={handleManualAdvance}
-        className={`flex-1 flex flex-col relative overflow-hidden cursor-pointer ${
-          mode === 'video' ? 'fixed inset-0 w-screen h-screen z-10 p-0 m-0 bg-black' : ''
-        }`}
-        title="Clique para alternar manualmente entre Agenda e Vídeo"
+        className="flex-1 flex flex-col relative overflow-hidden cursor-pointer"
+        title="Clique para alternar página de eventos"
       >
         <AnimatePresence mode="popLayout" initial={false}>
-          {mode === 'video' ? (
-            <motion.div
-              key="fullscreen-video-view"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="fixed inset-0 w-screen h-screen z-10 bg-black flex items-center justify-center overflow-hidden"
-            >
-              <FullscreenVideoView
-                videoUrl={activeVideoUrl || '/video.mp4'}
-                audioUnlocked={audioUnlocked}
-                onAudioUnlock={handleAudioUnlock}
-              />
-            </motion.div>
-          ) : mode === 'clock' ? (
+          {mode === 'clock' ? (
             <motion.div
               key="clock-view"
               initial={{ opacity: 0, scale: 0.99 }}
@@ -536,13 +381,6 @@ export default function App() {
           secondsUntilReload={secondsUntilReload}
           lastSyncTime={lastSyncTime}
           isSyncing={isSyncing}
-          cycleConfig={cycleConfig}
-          onUpdateCycleConfig={handleUpdateCycleConfig}
-          onUploadVideoFile={handleUploadVideoFile}
-          onResetVideoToDefault={handleResetVideoToDefault}
-          onSwitchMode={handleSwitchMode}
-          currentMode={mode}
-          remainingModeSeconds={remainingModeSeconds}
         />
       )}
     </div>
